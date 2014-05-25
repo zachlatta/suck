@@ -1,13 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"regexp"
 	"sync"
 	"time"
+
+	"crypto/md5"
 
 	"code.google.com/p/go.net/html"
 )
@@ -103,8 +107,23 @@ func (s *Sucker) worker(ch chan *http.Request) {
 				size = resp.ContentLength
 			}
 
-			links := links(resp.Body)
-			go func(links []*url.URL, base *url.URL) {
+			body, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				fmt.Println(err)
+			}
+
+			h := md5.New()
+			io.WriteString(h, req.URL.String())
+
+			err = ioutil.WriteFile(fmt.Sprintf("%x", h.Sum(nil)), body, 0644)
+			if err != nil {
+				fmt.Println(err)
+			}
+
+			reader := bytes.NewReader(body)
+
+			go func(body io.Reader, base *url.URL) {
+				links := links(body)
 				for _, link := range links {
 					link = base.ResolveReference(link)
 
@@ -119,7 +138,7 @@ func (s *Sucker) worker(ch chan *http.Request) {
 						s.jobs <- req
 					}
 				}
-			}(links, req.URL)
+			}(reader, req.URL)
 
 			resp.Body.Close()
 		}

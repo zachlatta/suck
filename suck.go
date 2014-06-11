@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -44,12 +45,12 @@ type Sucker struct {
 	results          chan *result
 }
 
-func (s *Sucker) Run() {
+func (s *Sucker) Run(firstURL string) {
 	s.results = make(chan *result, 99999999)
-	s.run()
+	s.run(firstURL)
 }
 
-func (s *Sucker) run() {
+func (s *Sucker) run(firstURL string) {
 	var wg sync.WaitGroup
 	wg.Add(s.ConcurrencyLevel)
 
@@ -62,7 +63,7 @@ func (s *Sucker) run() {
 		}()
 	}
 
-	req, err := http.NewRequest("GET", "http://wikipedia.org", nil)
+	req, err := http.NewRequest("GET", firstURL, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -155,9 +156,12 @@ func links(reader io.Reader) []*url.URL {
 }
 
 func main() {
+	firstURL := flag.String("first", "http://wikipedia.org", "first url to scrape")
+	flag.Parse()
+
 	sucker := Sucker{
 		ConcurrencyLevel: 64,
 	}
 
-	sucker.Run()
+	sucker.Run(*firstURL)
 }

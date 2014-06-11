@@ -12,8 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"crypto/md5"
-
 	"code.google.com/p/go.net/html"
 )
 
@@ -91,14 +89,6 @@ func (s *Sucker) worker(ch chan *request) {
 			}
 
 			body, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				fmt.Println(err)
-			}
-
-			h := md5.New()
-			io.WriteString(h, req.URL.String())
-
-			err = ioutil.WriteFile(fmt.Sprintf("%x", h.Sum(nil)), body, 0644)
 			if err != nil {
 				fmt.Println(err)
 			}

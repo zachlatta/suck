@@ -22,43 +22,25 @@ var (
 	urls         = NewURLMap()
 )
 
-type URLMap struct {
-	urlMap map[string]bool
-	mutex  *sync.Mutex
-}
-
-func NewURLMap() *URLMap {
-	return &URLMap{
-		urlMap: map[string]bool{},
-		mutex:  &sync.Mutex{},
-	}
-}
-
-func (u *URLMap) Exists(url string) bool {
-	u.mutex.Lock()
-	exists := u.urlMap[url]
-	u.mutex.Unlock()
-	return exists
-}
-
-func (u *URLMap) Add(url string) {
-	u.mutex.Lock()
-	u.urlMap[url] = true
-	u.mutex.Unlock()
-}
-
 var regexpURL = regexp.MustCompile(`(?i)\b((?:[a-z][\w-]+:(?:/{1,3}|[a-z0-9%])|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s!()\[\]{};:'".,<>?«»“”‘’]))`)
 
 type result struct {
+	url           *url.URL
+	referer       *url.URL
 	err           error
 	statusCode    int
 	duration      time.Duration
 	contentLength int64
 }
 
+type request struct {
+	*http.Request
+	referer *url.URL
+}
+
 type Sucker struct {
 	ConcurrencyLevel int
-	jobs             chan *http.Request
+	jobs             chan *request
 	results          chan *result
 }
 
@@ -71,7 +53,7 @@ func (s *Sucker) run() {
 	var wg sync.WaitGroup
 	wg.Add(s.ConcurrencyLevel)
 
-	s.jobs = make(chan *http.Request)
+	s.jobs = make(chan *request)
 
 	for i := 0; i < s.ConcurrencyLevel; i++ {
 		go func() {
@@ -85,18 +67,18 @@ func (s *Sucker) run() {
 		panic(err)
 	}
 
-	s.jobs <- req
+	s.jobs <- &request{req, nil}
 
 	wg.Wait()
 }
 
-func (s *Sucker) worker(ch chan *http.Request) {
+func (s *Sucker) worker(ch chan *request) {
 	client := &http.Client{}
 	for req := range ch {
 		requestsMade++
 		fmt.Printf("COUNT: %d, LINKS: %d, REQ RECEIVED: %s\n", requestsMade, urlsFound, req.URL.String())
 		start := time.Now()
-		resp, err := client.Do(req)
+		resp, err := client.Do(req.Request)
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -130,12 +112,12 @@ func (s *Sucker) worker(ch chan *http.Request) {
 					if !urls.Exists(link.String()) {
 						urlsFound++
 						urls.Add(link.String())
-						req, err = http.NewRequest("GET", link.String(), nil)
+						nextReq, err := http.NewRequest("GET", link.String(), nil)
 						if err != nil {
 							fmt.Println(err)
 						}
 
-						s.jobs <- req
+						s.jobs <- &request{nextReq, req.URL}
 					}
 				}
 			}(reader, req.URL)

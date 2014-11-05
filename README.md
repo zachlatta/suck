@@ -1,6 +1,6 @@
 # suck
 
-Such is a command-line utility that eats c̶h̶i̶l̶d̶r̶e̶n̶ websites. It's basically a
+Suck is a command-line utility that eats c̶h̶i̶l̶d̶r̶e̶n̶ websites. It's basically a
 naive web crawler that shoves what it finds into Neo4j.
 
 ## Getting Started
